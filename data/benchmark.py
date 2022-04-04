@@ -11,7 +11,7 @@ import torch
 import torch.utils.data as data
 
 class Benchmark(srdata.SRData):
-    def __init__(self, args, name='', train=True, benchmark=True):
+    def __init__(self, args, name='Set5', train=True, benchmark=True):
         super(Benchmark, self).__init__(
             args, name=name, train=train, benchmark=True
         )
@@ -21,8 +21,8 @@ class Benchmark(srdata.SRData):
         self.dir_hr = os.path.join(self.apath, 'HR')
         self.dir_lr = os.path.join(self.apath, 'LR_bicubic')
         self.ext = ('.png','.png')
-        # print(self.dir_hr)
-        # print(self.dir_lr)
+        print(self.dir_hr)
+        print(self.dir_lr)
 
 if __name__ == "__main__":
     import argparse
@@ -114,8 +114,17 @@ if __name__ == "__main__":
         print(hr.shape)
         print(name)
 
-        lr = lr[0,...].numpy() * 255.
-        lr = lr.transpose([1, 2, 0]).astype(np.uint8)
+        import scipy.misc as misc
+            
+
+
+        # lr = lr[0,...].numpy() * 255.
+        lr = lr[0].data.mul(255.)
+
+        # lr = lr.transpose([1, 2, 0]).astype(np.uint8)
+        lr = lr.byte().permute(1, 2, 0).cpu().numpy()
+
+        misc.imsave('{}{}.png'.format("testLoader", "0"), lr)
         imageio.imwrite('Set1.jpg', lr)
 
         break

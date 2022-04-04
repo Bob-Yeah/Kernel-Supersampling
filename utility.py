@@ -53,8 +53,9 @@ class checkpoint():
             if not os.path.exists(self.dir):
                 args.load = '.'
             else:
-                self.log = torch.load(self.dir + '/psnr_log.pt')
-                print('Continue from epoch {}...'.format(len(self.log)))
+                # self.log = torch.load(self.dir + '/psnr_log.pt')
+                # print('Continue from epoch {}...'.format(len(self.log)))
+                print('load model...')
 
         if args.reset:
             os.system('rm -rf ' + self.dir)
@@ -135,7 +136,7 @@ def calc_psnr(sr, hr, scale, rgb_range, benchmark=False):
     #print(hr.size())
     diff = (sr - hr).data.div(rgb_range)
     if benchmark:
-        shave = scale
+        shave = int(scale)
         if diff.size(1) > 1:
             convert = diff.new(1, 3, 1, 1)
             convert[0, 0, 0, 0] = 65.738
@@ -145,7 +146,7 @@ def calc_psnr(sr, hr, scale, rgb_range, benchmark=False):
             diff = diff.sum(dim=1, keepdim=True)
     else:
         shave = scale + 6
-    #shave = int(shave)
+    shave = int(shave)
     import math
     shave = math.ceil(shave)
     valid = diff[:, :, shave:-shave, shave:-shave]

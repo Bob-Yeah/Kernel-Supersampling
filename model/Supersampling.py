@@ -11,11 +11,12 @@ from PIL import Image, ImageOps
 
 class Supersampling(nn.Module): 
     
-    def __init__(self,kernel_size =3, outC = 3, featC = 6):
+    def __init__(self,kernel_size =3, outC = 3, featC = 6, sep_kernel = False):
         super(Supersampling, self).__init__()
         self.kernel_size = kernel_size
         self.outC = outC
         self.featC = featC
+        self.sep_kernel = sep_kernel
         self.unfold = nn.Unfold(kernel_size=(3,3),padding=1)
 
     def forward(self, feat, kernel_map):
@@ -47,52 +48,131 @@ class Supersampling(nn.Module):
         # N, 6, H, W
         # R = feat[:,0:self.featC,:,:]
         
-        # N, 6*9, H, W
-        K_R = kernel_map[:,0:self.featC*self.kernel_size*self.kernel_size,:,:] 
+        if (self.outC == 1): #3通道共享kernel
+            # N, 6*9, H, W
+            K = kernel_map[:,0:self.featC*self.kernel_size*self.kernel_size,:,:] 
+            # print("K:",K.shape)
+            K_mat = K.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+            # print("K_mat:",K_mat.shape)
 
-        # G = feat[:,self.featC:2*self.layer_per_out,:,:]
-        K_G = kernel_map[:,self.featC*self.kernel_size*self.kernel_size:2*self.featC*self.kernel_size*self.kernel_size,:,:] 
-        
-        # B = feat[:,2*self.featC:3*self.layer_per_out,:,:]
-        K_B = kernel_map[:,2*self.featC*self.kernel_size*self.kernel_size:3*self.featC*self.kernel_size*self.kernel_size,:,:] 
+            # R = feat[:,0:self.featC,:,:]
 
-        # Demo Code
-        # >>> # Convolution is equivalent with Unfold + Matrix Multiplication + Fold (or view to output shape)
-        # >>> inp = torch.randn(1, 3, 10, 12)
-        # >>> w = torch.randn(2, 3, 4, 5)
-        # >>> inp_unf = torch.nn.functional.unfold(inp, (4, 5))
-        # >>> out_unf = inp_unf.transpose(1, 2).matmul(w.view(w.size(0), -1).t()).transpose(1, 2)
-        # >>> out = torch.nn.functional.fold(out_unf, (7, 8), (1, 1))
-        # >>> # or equivalently (and avoiding a copy),
-        # >>> # out = out_unf.view(1, 2, 7, 8)
-        # >>> (torch.nn.functional.conv2d(inp, w) - out).abs().max()
-        # tensor(1.9073e-06)
+            # R_unf = self.unfold(R) # N, 6*9, H*W
+            # # print("R_unf:",R_unf.shape)
+            # # R_mat = N*H*W, 1, 6*9
+            # R_mat = R_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            # print("R_mat:",R_mat.shape)
+            # Out_R = torch.matmul(R_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            
+            # return Out_R
 
-        feat_unf = self.unfold(feat)
-        feat_mat = feat_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
-        # R_unf = self.unfold(R) # N, 6*9, H*W
-        # R_mat = N*H*W, 1, 6*9
-        # R_mat = R_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
-        # K_R_mat =  N*H*W, 6*9 , 1
-        K_R_mat = K_R.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
-        Out_R = torch.matmul(feat_mat,K_R_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            R = feat[:,0:self.featC,:,:]
+            G = feat[:,self.featC:2*self.featC,:,:]
+            B = feat[:,2*self.featC:3*self.featC,:,:]
 
-        # G_unf = self.unfold(G) # N, 6*9, H*W
-        # R_mat = N*H*W, 1, 6*9
-        # G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
-        # K_R_mat =  N*H*W, 6*9 , 1
-        K_G_mat = K_G.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
-        Out_G = torch.matmul(feat_mat,K_G_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            R_unf = self.unfold(R) # N, 6*9, H*W
+            # print("R_unf:",R_unf.shape)
+            # R_mat = N*H*W, 1, 6*9
+            R_mat = R_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            # print("R_mat:",R_mat.shape)
+            Out_R = torch.matmul(R_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
 
-        # B_unf = self.unfold(B) # N, 6*9, H*W
-        # R_mat = N*H*W, 1, 6*9
-        # B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
-        # K_R_mat =  N*H*W, 6*9 , 1
-        K_B_mat = K_B.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
-        Out_B = torch.matmul(feat_mat,K_B_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
-        
-        out = torch.cat((Out_R,Out_G,Out_B),dim=1)
-        return out
+            G_unf = self.unfold(G) # N, 6*9, H*W
+            # R_mat = N*H*W, 1, 6*9
+            G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            Out_G = torch.matmul(G_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+
+            B_unf = self.unfold(B) # N, 6*9, H*W
+            # R_mat = N*H*W, 1, 6*9
+            B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            Out_B = torch.matmul(B_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            
+            out = torch.cat((Out_R,Out_G,Out_B),dim=1)
+            return out
+
+        else:
+            if (self.sep_kernel):
+                # N, 6*9, H, W  
+                K_R = kernel_map[:,0:self.featC*self.kernel_size*self.kernel_size,:,:] 
+                K_R_mat = K_R.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                # G = feat[:,self.featC:2*self.layer_per_out,:,:]
+                K_G = kernel_map[:,self.featC*self.kernel_size*self.kernel_size:2*self.featC*self.kernel_size*self.kernel_size,:,:] 
+                K_G_mat = K_G.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                # B = feat[:,2*self.featC:3*self.layer_per_out,:,:]
+                K_B = kernel_map[:,2*self.featC*self.kernel_size*self.kernel_size:3*self.featC*self.kernel_size*self.kernel_size,:,:] 
+                K_B_mat = K_B.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                
+                R = feat[:,0:self.featC,:,:]
+                G = feat[:,self.featC:2*self.featC,:,:]
+                B = feat[:,2*self.featC:3*self.featC,:,:]
+
+                R_unf = self.unfold(R) # N, 6*9, H*W
+                # print("R_unf:",R_unf.shape)
+                # R_mat = N*H*W, 1, 6*9
+                R_mat = R_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+                # print("R_mat:",R_mat.shape)
+                Out_R = torch.matmul(R_mat,K_R_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+
+                G_unf = self.unfold(G) # N, 6*9, H*W
+                # R_mat = N*H*W, 1, 6*9
+                G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+                Out_G = torch.matmul(G_mat,K_G_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+
+                B_unf = self.unfold(B) # N, 6*9, H*W
+                # R_mat = N*H*W, 1, 6*9
+                B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+                Out_B = torch.matmul(B_mat,K_B_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+                
+                out = torch.cat((Out_R,Out_G,Out_B),dim=1)
+                return out
+            else:
+                    
+                # N, 6*9, H, W  
+                K_R = kernel_map[:,0:self.featC*self.kernel_size*self.kernel_size,:,:] 
+
+                # G = feat[:,self.featC:2*self.layer_per_out,:,:]
+                K_G = kernel_map[:,self.featC*self.kernel_size*self.kernel_size:2*self.featC*self.kernel_size*self.kernel_size,:,:] 
+                
+                # B = feat[:,2*self.featC:3*self.layer_per_out,:,:]
+                K_B = kernel_map[:,2*self.featC*self.kernel_size*self.kernel_size:3*self.featC*self.kernel_size*self.kernel_size,:,:] 
+
+                # Demo Code
+                # >>> # Convolution is equivalent with Unfold + Matrix Multiplication + Fold (or view to output shape)
+                # >>> inp = torch.randn(1, 3, 10, 12)
+                # >>> w = torch.randn(2, 3, 4, 5)
+                # >>> inp_unf = torch.nn.functional.unfold(inp, (4, 5))
+                # >>> out_unf = inp_unf.transpose(1, 2).matmul(w.view(w.size(0), -1).t()).transpose(1, 2)
+                # >>> out = torch.nn.functional.fold(out_unf, (7, 8), (1, 1))
+                # >>> # or equivalently (and avoiding a copy),
+                # >>> # out = out_unf.view(1, 2, 7, 8)
+                # >>> (torch.nn.functional.conv2d(inp, w) - out).abs().max()
+                # tensor(1.9073e-06)
+
+                feat_unf = self.unfold(feat)
+                feat_mat = feat_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+                # R_unf = self.unfold(R) # N, 6*9, H*W
+                # R_mat = N*H*W, 1, 6*9
+                # R_mat = R_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
+                # K_R_mat =  N*H*W, 6*9 , 1
+                K_R_mat = K_R.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                Out_R = torch.matmul(feat_mat,K_R_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+
+                # G_unf = self.unfold(G) # N, 6*9, H*W
+                # R_mat = N*H*W, 1, 6*9
+                # G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
+                # K_R_mat =  N*H*W, 6*9 , 1
+                K_G_mat = K_G.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                Out_G = torch.matmul(feat_mat,K_G_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+
+                # B_unf = self.unfold(B) # N, 6*9, H*W
+                # R_mat = N*H*W, 1, 6*9
+                # B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.layer_per_out*self.kernel_size*self.kernel_size)
+                # K_R_mat =  N*H*W, 6*9 , 1
+                K_B_mat = K_B.permute(0,2,3,1).reshape(-1, self.featC*self.kernel_size*self.kernel_size, 1)
+                Out_B = torch.matmul(feat_mat,K_B_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+                
+                out = torch.cat((Out_R,Out_G,Out_B),dim=1)
+                return out
 
 
 

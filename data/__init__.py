@@ -14,7 +14,8 @@ class Data:
                 num_workers=args.n_threads,
                 pin_memory=not args.cpu
             )
-        
+            print(len(self.loader_train))
+
         print(args.data_test)
         if args.data_test in ['Set5', 'Set14', 'B100', 'Manga109', 'Urban100']:
             module_test = import_module('data.benchmark')
@@ -23,7 +24,6 @@ class Data:
             module_test = import_module('data.' +  args.data_test.lower())
             testset = getattr(module_test, args.data_test)(args, train=False)
 
-        print(len(testset))
         self.loader_test = DataLoader(
             dataset=testset,
             batch_size=1,

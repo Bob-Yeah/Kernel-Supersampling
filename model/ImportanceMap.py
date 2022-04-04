@@ -9,10 +9,10 @@ import math
 
 class ImportanceMap(nn.Module): 
 
-    def __init__(self, map_layers = 1):
+    def __init__(self,  map_layers = 1, feat_layers = 6):
         super(ImportanceMap, self).__init__()
-        self.upscale = nn.ConvTranspose2d(in_channels=12, out_channels=6, kernel_size=3, stride=2, padding=1, output_padding=1, bias=True)
-        self.genmap = nn.Conv2d(in_channels=6, out_channels=map_layers, kernel_size=3, stride=1, padding=1)
+        self.upscale = nn.ConvTranspose2d(in_channels=12, out_channels=feat_layers, kernel_size=3, stride=2, padding=1, output_padding=1, bias=True)
+        self.genmap = nn.Conv2d(in_channels=feat_layers, out_channels=map_layers, kernel_size=3, stride=1, padding=1)
         
     def forward(self, x):
         feat = self.upscale(x)

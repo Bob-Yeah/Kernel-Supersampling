@@ -90,8 +90,9 @@ class SRData(data.Dataset):
         # print(self.images_lr)
 
         if train:
-            self.repeat \
-                = args.test_every // (len(self.images_hr) // args.batch_size)
+            # self.repeat \
+            #     = args.test_every // (len(self.images_hr) // args.batch_size)
+            self.repeat  = 1
             print("train repeat:" + str(self.repeat))
         
     # Below functions as used to prepare images
@@ -152,6 +153,7 @@ class SRData(data.Dataset):
     def __getitem__(self, idx):
         lr, hr, filename = self._load_file(idx)
         lr, hr = self.get_patch(lr, hr)
+        # lr, hr = common.set_channel(lr, hr, n_channels=self.args.n_colors)
         lr, hr = common.set_channel(lr, hr, n_channels=self.args.n_colors)
         lr_tensor, hr_tensor = common.np2Tensor(
             lr, hr, rgb_range=self.args.rgb_range

@@ -22,10 +22,12 @@ class DIV2K(multiscalesrdata.SRData):
         names_hr, names_lr = super(DIV2K, self)._scan()
         names_hr = names_hr[self.begin - 1:self.end]
         names_lr = names_lr[self.begin - 1:self.end]
+        
         return names_hr, names_lr
 
     def _set_filesystem(self, dir_data):
         super(DIV2K, self)._set_filesystem(dir_data)
+        print(self.apath)
         self.dir_hr = os.path.join(self.apath, 'DIV2K_train_HR')
         self.dir_lr = os.path.join(self.apath, 'DIV2K_train_LR_bicubic')
 

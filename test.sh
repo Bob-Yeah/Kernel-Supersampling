@@ -1,0 +1,2 @@
+# python main.py --data_train="DIV2K" --data_range='1-800/700-800' --save='SepFeatSepKernelDIV2K' --dir_data='/home/yejiannan/SIGGRAPH2022/data' --epochs=1000
+python main.py --test_only --load='SepFeatSepKernelDIV2K' 

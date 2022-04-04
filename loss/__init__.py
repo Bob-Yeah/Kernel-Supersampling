@@ -73,7 +73,7 @@ class Loss(nn.modules.loss._Loss):
             # print(l)
             if l['function'] is not None:
                 loss = l['function'](sr, hr)
-                # print(loss)
+                print(loss)
                 effective_loss = l['weight'] * loss
                 losses.append(effective_loss)
                 self.log[-1, i] += effective_loss.item()

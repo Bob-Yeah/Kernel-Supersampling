@@ -219,11 +219,16 @@ class RepVGGFE(nn.Module):
         self.stage0 = RepVGGBlock(in_channels=3, out_channels=14, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
         self.stage1 = RepVGGBlock(in_channels=14, out_channels=14, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
         self.stage2 = RepVGGBlock(in_channels=14, out_channels=12, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
-
+        # self.stage3 = RepVGGBlock(in_channels=14, out_channels=14, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
+        # self.stage4 = RepVGGBlock(in_channels=14, out_channels=14, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
+        # self.stage5 = RepVGGBlock(in_channels=14, out_channels=12, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
     def forward(self, x):
         out = self.stage0(x)
         out = self.stage1(out)
         out = self.stage2(out)
+        # out = self.stage3(out)
+        # out = self.stage4(out)
+        # out = self.stage5(out)
         return out
 
 

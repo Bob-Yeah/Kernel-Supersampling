@@ -60,7 +60,10 @@ if checkpoint.ok:
     t = Trainer(args, loader, model, loss, checkpoint)
 
     while not t.terminate():
-        t.train()
-        #t.test()
+        # t.train()
+        if args.test_only:
+            t.test()
+        else:
+            t.train()
 
     checkpoint.done()

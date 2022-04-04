@@ -18,16 +18,28 @@ class Trainer():
         self.loader_test = loader.loader_test
         self.model = my_model
         self.loss = my_loss
-        self.optimizer = utility.make_optimizer(args, self.model)
-        self.scheduler = utility.make_scheduler(args, self.optimizer)
+        if (not args.test_only):
+            self.optimizer = utility.make_optimizer(args, self.model)
+            self.scheduler = utility.make_scheduler(args, self.optimizer)
 
-        if self.args.load != '.':
-            self.optimizer.load_state_dict(
-                torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
-            )
-            for _ in range(len(ckp.log)): self.scheduler.step()
+            if self.args.load != '.':
+                self.optimizer.load_state_dict(
+                    torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
+                )
+                for _ in range(len(ckp.log)): self.scheduler.step()
 
-        self.error_last = 1e8
+            self.error_last = 1e8
+        else:
+            if self.args.load != '.':
+                # model_ = torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
+                # for i in model_.keys(): print(i)
+                # print("##################################################")
+                # for i in self.model.state_dict().keys(): print(i)
+                # print(self.model.state_dict())
+                self.model.get_model().load_state_dict(
+                    torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
+                )
+                # self.model = torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
 
     def train(self):
         self.scheduler.step()
@@ -42,7 +54,7 @@ class Trainer():
         self.model.train()
         
         device = torch.device('cpu' if self.args.cpu else 'cuda')
-        torch.autograd.set_detect_anomaly(True)
+        # torch.autograd.set_detect_anomaly(True)
         timer_data, timer_model = utility.timer(), utility.timer()
         for batch, (lr, hr, name) in enumerate(self.loader_train):
             lr, hr = self.prepare(lr, hr)
@@ -82,87 +94,144 @@ class Trainer():
             target = self.model
         else:
             target = self.model  #.module
-
-        torch.save(
-            target.state_dict(),
-            os.path.join(self.ckp.dir,'model', 'model_{}.pt'.format(epoch))
-        )
-        ## save models
+        if (epoch % 100 == 0):
+            torch.save(
+                target.state_dict(),
+                os.path.join(self.ckp.dir,'model', 'model_{}.pt'.format(epoch))
+            )
+            ## save models
 
     def test(self):  
-        epoch = self.scheduler.last_epoch + 1
-        self.ckp.write_log('\nEvaluation:')
-        self.ckp.add_log(torch.zeros(1, len(self.scale)))
-        self.model.eval()
-        timer_test = utility.timer()
-        device = torch.device('cpu' if self.args.cpu else 'cuda')
-        with torch.no_grad():
-            for idx_scale, scale in enumerate(self.scale):
-                eval_acc = 0
-                eval_acc_ssim = 0
-                for idx_img, (lr, hr, filename, _) in enumerate(self.loader_test):
-                    filename = filename[0]
-                    no_eval = (hr.nelement() == 1)
-                    if not no_eval:
-                        lr, hr = self.prepare(lr, hr)
-                    else:
-                        lr, = self.prepare(lr)
+        if not self.args.test_only:
 
-                    N,C,H,W = lr.size()
-                    scale = self.args.scale[idx_scale]
-                    outH,outW = int(H*scale),int(W*scale)
-                    #_,_,outH,outW = hr.size()
-                    #timer_test.tic()
+            epoch = self.scheduler.last_epoch + 1
+            self.ckp.write_log('\nEvaluation:')
+            self.ckp.add_log(torch.zeros(1, len(self.scale)))
+            self.model.eval()
+            timer_test = utility.timer()
+            device = torch.device('cpu' if self.args.cpu else 'cuda')
+            with torch.no_grad():
+                for idx_scale, scale in enumerate(self.scale):
+                    eval_acc = 0
+                    eval_acc_ssim = 0
 
-                    scale_coord_map, mask = self.input_matrix_wpn(H,W,self.args.scale[idx_scale])
-                    #position, mask = self.pos_matrix(H,W,self.args.scale[idx_scale])
-                    #print(timer_test.toc())
-                    if self.args.n_GPUs>1 and not self.args.cpu:
-                        scale_coord_map = torch.cat([scale_coord_map]*self.args.n_GPUs,0)
-                    else:
-                        scale_coord_map = scale_coord_map.to(device)
+                    for idx_img, (lr, hr, filename) in enumerate(self.loader_test):
+                        filename = filename[0]
+                        print("test file:", filename)
+                        no_eval = (hr.nelement() == 1)
+                        if not no_eval:
+                            lr, hr = self.prepare(lr, hr)
+                        else:
+                            lr, = self.prepare(lr)
 
-                    timer_test.tic()
-                    sr = self.model(lr, idx_scale,scale_coord_map)
-                    timer_test.hold()
-                    re_sr = torch.masked_select(sr,mask.to(device))
-                    sr = re_sr.contiguous().view(N,C,outH,outW)
-                    sr = utility.quantize(sr, self.args.rgb_range)
-                    #timer_test.hold()
-                    save_list = [sr]
-                    if not no_eval:
-                        eval_acc += utility.calc_psnr(
-                            sr, hr, scale, self.args.rgb_range,
-                            benchmark=self.loader_test.dataset.benchmark
+                        N,C,H,W = lr.size()
+                        scale = self.args.scale[idx_scale]
+                        
+                        timer_test.tic()
+                        sr = self.model(lr)
+                        timer_test.hold()
+
+                        sr = utility.quantize(sr, self.args.rgb_range)
+                        #timer_test.hold()
+                        save_list = [sr]
+                        if not no_eval:
+                            eval_acc += utility.calc_psnr(
+                                sr, hr, scale, self.args.rgb_range,
+                                benchmark=self.loader_test.dataset.benchmark
+                            )
+                            eval_acc_ssim += utility.calc_ssim(
+                                sr, hr, scale,
+                                benchmark=self.loader_test.dataset.benchmark
+                            )
+                            save_list.extend([lr, hr])
+
+                        if self.args.save_results:
+                            a=1
+                            self.ckp.save_results(filename, save_list, scale)
+
+                    self.ckp.log[-1, idx_scale] = eval_acc / len(self.loader_test)
+                    best = self.ckp.log.max(0)
+                # print(timer_test.acc/100)
+                    self.ckp.write_log(
+                        '[{} x{}]\tPSNR: {:.3f} SSIM: {:.4f} (Best: {:.3f} @epoch {})'.format(
+                            self.args.data_test,
+                            scale,
+                            self.ckp.log[-1, idx_scale],
+                            eval_acc_ssim / len(self.loader_test),
+                            best[0][idx_scale],
+                            best[1][idx_scale] + 1
                         )
-                        eval_acc_ssim += utility.calc_ssim(
-                            sr, hr, scale,
-                            benchmark=self.loader_test.dataset.benchmark
-                        )
-                        save_list.extend([lr, hr])
+                    )
+            self.ckp.write_log(
+                'Total time: {:.2f}s\n'.format(timer_test.toc()), refresh=True
+            )
+            if not self.args.test_only:
+                self.ckp.save(self, epoch, is_best=(best[1][0] + 1 == epoch))
+        else:
+            import scipy.misc as misc
+            def _save_results(filename, save_list, scale):
+                filename = '{}/results/{}_x{}_'.format(self.ckp.dir, filename, scale)
+                postfix = ('SR', 'LR', 'HR')
+                for v, p in zip(save_list, postfix):
+                    normalized = v[0].data.mul(self.args.rgb_range)
+                    ndarr = normalized.byte().permute(1, 2, 0).cpu().numpy()
+                    misc.imsave('{}{}.png'.format(filename, p), ndarr)
+            
+            self.model.eval()
+            timer_test = utility.timer()
+            device = torch.device('cpu' if self.args.cpu else 'cuda')
+            with torch.no_grad():
+                for idx_scale, scale in enumerate(self.scale):
+                    eval_acc = 0
+                    eval_acc_ssim = 0
 
-                    if self.args.save_results:
-                        a=1
-                        self.ckp.save_results(filename, save_list, scale)
+                    for idx_img, (lr, hr, filename) in enumerate(self.loader_test):
+                        filename = filename[0]
+                        print("test file:", filename)
+                        no_eval = (hr.nelement() == 1)
+                        if not no_eval:
+                            lr, hr = self.prepare(lr, hr)
+                        else:
+                            lr, = self.prepare(lr)
 
-                self.ckp.log[-1, idx_scale] = eval_acc / len(self.loader_test)
-                best = self.ckp.log.max(0)
-               # print(timer_test.acc/100)
-                self.ckp.write_log(
-                    '[{} x{}]\tPSNR: {:.3f} SSIM: {:.4f} (Best: {:.3f} @epoch {})'.format(
+                        N,C,H,W = lr.size()
+                        scale = int(self.args.scale[idx_scale])
+                        
+                        timer_test.tic()
+                        sr = self.model(lr)
+                        timer_test.hold()
+
+                        # sr = utility.quantize(sr, self.args.rgb_range)
+                        # lr = torch.cat([lr,lr,lr],dim=1)
+                        # hr = torch.cat([hr,hr,hr],dim=1)
+                        # sr = torch.cat([sr,sr,sr],dim=1)
+
+                        # print("sr:",sr.shape)
+                        # print("lr:",lr.shape)
+                        # print("hr:",hr.shape)
+                        #timer_test.hold()
+                        save_list = [sr]
+                        if not no_eval:
+                            eval_acc += utility.calc_psnr(
+                                sr, hr, scale, self.args.rgb_range,
+                                benchmark=self.loader_test.dataset.benchmark
+                            )
+                            eval_acc_ssim += utility.calc_ssim(
+                                sr, hr, scale,
+                                benchmark=self.loader_test.dataset.benchmark
+                            )
+                            save_list.extend([lr, hr])
+                        _save_results(filename,save_list,scale)
+                        # print(save_list)
+                        
+                    print('[{} x{}]\tPSNR: {:.3f} SSIM: {:.4f}'.format(
                         self.args.data_test,
                         scale,
-                        self.ckp.log[-1, idx_scale],
-                        eval_acc_ssim / len(self.loader_test),
-                        best[0][idx_scale],
-                        best[1][idx_scale] + 1
-                    )
-                )
-        self.ckp.write_log(
-            'Total time: {:.2f}s\n'.format(timer_test.toc()), refresh=True
-        )
-        if not self.args.test_only:
-            self.ckp.save(self, epoch, is_best=(best[1][0] + 1 == epoch))
+                        eval_acc  / len(self.loader_test),
+                        eval_acc_ssim / len(self.loader_test)
+                    ))
+                    
+
 
     def prepare(self, *args):
         device = torch.device('cpu' if self.args.cpu else 'cuda')

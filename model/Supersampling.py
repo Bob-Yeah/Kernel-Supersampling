@@ -67,8 +67,8 @@ class Supersampling(nn.Module):
             # return Out_R
 
             R = feat[:,0:self.featC,:,:]
-            G = feat[:,self.featC:2*self.featC,:,:]
-            B = feat[:,2*self.featC:3*self.featC,:,:]
+            # G = feat[:,self.featC:2*self.featC,:,:]
+            # B = feat[:,2*self.featC:3*self.featC,:,:]
 
             R_unf = self.unfold(R) # N, 6*9, H*W
             # print("R_unf:",R_unf.shape)
@@ -77,18 +77,18 @@ class Supersampling(nn.Module):
             # print("R_mat:",R_mat.shape)
             Out_R = torch.matmul(R_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
 
-            G_unf = self.unfold(G) # N, 6*9, H*W
-            # R_mat = N*H*W, 1, 6*9
-            G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
-            Out_G = torch.matmul(G_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            # G_unf = self.unfold(G) # N, 6*9, H*W
+            # # R_mat = N*H*W, 1, 6*9
+            # G_mat = G_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            # Out_G = torch.matmul(G_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
 
-            B_unf = self.unfold(B) # N, 6*9, H*W
-            # R_mat = N*H*W, 1, 6*9
-            B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
-            Out_B = torch.matmul(B_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
+            # B_unf = self.unfold(B) # N, 6*9, H*W
+            # # R_mat = N*H*W, 1, 6*9
+            # B_mat = B_unf.permute(0,2,1).reshape(-1, 1, self.featC*self.kernel_size*self.kernel_size)
+            # Out_B = torch.matmul(B_mat,K_mat).squeeze(1).squeeze(1).reshape(batch_size,H,W).unsqueeze(1) # N*H*W
             
-            out = torch.cat((Out_R,Out_G,Out_B),dim=1)
-            return out
+            # out = torch.cat((Out_R,Out_G,Out_B),dim=1)
+            return Out_R
 
         else:
             if (self.sep_kernel):

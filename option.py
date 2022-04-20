@@ -23,9 +23,7 @@ parser.add_argument('--data_train', type=str, default='DIV2K',
                     help='train dataset name')
 parser.add_argument('--data_test', type=str, default='Set5',
                     help='test dataset name')
-parser.add_argument('--data_range', type=str, default='1-780/780-800',
-                    help='train/test data range')
-parser.add_argument('--ext', type=str, default='img',
+parser.add_argument('--ext', type=str, default='.png',
                     help='dataset file extension')
 parser.add_argument('--scale', type=str, default='2',
                     help='super resolution scale')
@@ -82,7 +80,7 @@ parser.add_argument('--precision', type=str, default='single',
 # Optimization specifications
 parser.add_argument('--lr', type=float, default=1e-4,
                     help='learning rate')
-parser.add_argument('--lr_decay', type=int, default=200,
+parser.add_argument('--lr_decay', type=int, default=1000,
                     help='learning rate decay per N epochs')
 parser.add_argument('--decay_type', type=str, default='step',
                     help='learning rate decay type')
@@ -105,7 +103,7 @@ parser.add_argument('--start_epoch', type=int, default=0,
                     help='resume from the snapshot, and the start_epoch')
 
 # Loss specifications
-parser.add_argument('--loss', type=str, default='1*L1',
+parser.add_argument('--loss', type=str, default='1*MSE',
                     help='loss function configuration')
 parser.add_argument('--skip_threshold', type=float, default='1e6',
                     help='skipping batch that has large error')
@@ -126,19 +124,6 @@ parser.add_argument('--save_results', default = True,
                     help='save output results')
                     # action='store_true',
 args = parser.parse_args()
-
-#args.scale = list(map(lambda x: int(x), args.scale.split('+')))
-###here we redefine the scale
-
-# if args.scale=='':
-#     import numpy as np
-#     #args.scale = np.linspace(1.1,4,30)
-#     args.scale = [1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
-#     #print(args.scale)
-# else:
-#     args.scale = list(map(lambda x: float(x), args.scale.split('+')))
-# print(args.scale)
-
 
 for arg in vars(args):
     if vars(args)[arg] == 'True':

@@ -17,7 +17,7 @@ class Data:
             print(len(self.loader_train))
 
         print(args.data_test)
-        if args.data_test in ['Set5', 'Set14', 'B100', 'Manga109', 'Urban100']:
+        if args.data_test in ['Set5', 'Set14', 'B100', 'Manga109', 'Urban100', 'DIV2K_VID']:
             module_test = import_module('data.benchmark')
             testset = getattr(module_test, 'Benchmark')(args, name=args.data_test,train=False)
         else:

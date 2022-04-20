@@ -134,7 +134,8 @@ def quantize(img, rgb_range):
 def calc_psnr(sr, hr, scale, rgb_range, benchmark=False):
     #print(sr.size())
     #print(hr.size())
-    diff = (sr - hr).data.div(rgb_range)
+    # diff = (sr - hr).data.div(rgb_range)
+    diff = (sr - hr).data
     if benchmark:
         shave = int(scale)
         if diff.size(1) > 1:
@@ -164,7 +165,9 @@ def calc_ssim(img1, img2, scale=2, benchmark=False):
         border = math.ceil(scale)
     else:
         border = math.ceil(scale)+6
-        
+    
+    img1 = img1.mul_(255.)
+    img2 = img2.mul_(255.)
     img1 = img1.data.squeeze().float().clamp(0,255).round().cpu().numpy()
     img1 = np.transpose(img1,(1,2,0))
     img2 = img2.data.squeeze().cpu().numpy()

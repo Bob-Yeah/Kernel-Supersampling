@@ -224,10 +224,14 @@ class RepVGGFE(nn.Module):
         self.stage5 = RepVGGBlock(in_channels=14, out_channels=12, kernel_size=3, stride=1, padding=1, deploy=self.deploy, use_se=self.use_se)
     def forward(self, x):
         out = self.stage0(x)
-        out = self.stage1(out)
-        out = self.stage2(out)
-        out = self.stage3(out)
-        out = self.stage4(out)
+        out1 = self.stage1(out)
+        out = out + out1
+        out1 = self.stage2(out)
+        out = out + out1
+        out1 = self.stage3(out)
+        out = out + out1
+        out1 = self.stage4(out)
+        out = out + out1
         out = self.stage5(out)
         return out
 

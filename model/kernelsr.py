@@ -43,7 +43,7 @@ class KernelSR(nn.Module):
         self.importance_map = ImportanceMap.ImportanceMap(map_layers = 18, feat_layers = 18)
         self.kernel_construction = KernelConstruction.KernelConstruction(outC = 3)
         self.supersampling = Supersampling.Supersampling(outC = 3, featC = 6, sep_kernel = True)
-        
+
         #逐像素预测kernel
         # self.importance_map = ImportanceMap.ImportanceMap(map_layers = 1, feat_layers = 6)
         # self.supersampling = Supersampling.Supersampling(outC = 1, featC = 6, sep_kernel = True)
@@ -84,16 +84,36 @@ class KernelSR(nn.Module):
         # Initialize model weights.
         # self._initialize_weights()
 
+        self.tail = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=6, kernel_size=3, stride=1, padding=1),
+            nn.PReLU(6),
+            nn.Conv2d(in_channels=6, out_channels=3, kernel_size=3, stride=1, padding=1)
+        )
+
+        # define tail module
+        # m_tail = [
+        #     common.Upsampler(common.default_conv, 2, 12, act=False),
+        #     nn.Conv2d(
+        #         12, 3, 3,
+        #         padding=(3//2)
+        #     )
+        # ]
+        # self.tail = nn.Sequential(*m_tail)
+
     def forward(self, x):
         feat = self.feat_extraction(x)
         # print(feat.shape)
+        # out = self.tail(feat)
+        # out = self.nonlinearity(out)
+        # return out
+        #  kernel SR
         feat, immap = self.importance_map(feat)
         # print(immap.shape)
         # print(feat.shape)
         kernels = self.kernel_construction(immap)
         # print(kernels.shape)
         out = self.supersampling(feat,kernels)
-        out = self.nonlinearity(out)
+        out = self.nonlinearity(self.tail(out))
         # print(out.shape)
         return out
 

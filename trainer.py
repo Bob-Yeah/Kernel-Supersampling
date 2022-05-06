@@ -7,6 +7,7 @@ import pdb
 import torch
 from torch.autograd import Variable
 from tqdm import tqdm
+import time
 
 class Trainer():
     def __init__(self, args, loader, my_model, my_loss, ckp):
@@ -72,6 +73,9 @@ class Trainer():
             # ulr = m(lr)
             # sr = sr + ulr
 
+            # print(lr.shape)
+            # print(hr.shape)
+            # print(sr.shape)
             if (epoch % 10 == 1):
                 import scipy.misc as misc
                 import numpy as np
@@ -157,7 +161,13 @@ class Trainer():
                     scale = int(self.args.scale)
                     
                     timer_test.tic()
+                    start_time = time.time()
+
                     sr = self.model(lr[:,0:self.args.n_colors,:,:])
+
+                    # your code
+                    elapsed_time = time.time() - start_time
+                    print("duration:",elapsed_time)
                     m = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
                     ulr = m(lr)
                     # sr = ulr + sr

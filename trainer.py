@@ -187,7 +187,7 @@ class Trainer():
                         eval_acc += acc_i
 
                         print(acc_i)
-                        
+                        # SSIM的指标 这里的话就需要修改 ，直接用下面这个跑不起来
                         # eval_acc_ssim += utility.calc_ssim(
                         #     sr, hr, scale,
                         #     benchmark=self.loader_test.dataset.benchmark
@@ -198,6 +198,7 @@ class Trainer():
                         #     lr, hr, scale,
                         #     benchmark=self.loader_test.dataset.benchmark
                         # ))
+                        
                         save_list.extend([ulr, hr])
                     _save_results(filename,save_list,scale)
                     # print(save_list)

@@ -1,18 +1,21 @@
-# 模型应该没有问题，像素噪声一样的瑕疵，可能是训练的问题，最好就是看一下原文相关的训练的部分，更改一下训练参数或者逻辑
 from model import common
 
 import torch.nn as nn
 
+from model import ImportanceMap
+from model import KernelConstruction
+from model import Supersampling
+
 def make_model(args, parent=False):
     if args.dilation:
         from model import dilated
-        return EDSR(args, dilated.dilated_conv)
+        return KernelEDSR(args, dilated.dilated_conv)
     else:
-        return EDSR(args)
+        return KernelEDSR(args)
 
-class EDSR(nn.Module):
+class KernelEDSR(nn.Module):
     def __init__(self, args, conv=common.default_conv):
-        super(EDSR, self).__init__()
+        super(KernelEDSR, self).__init__()
 
         n_resblock = args.n_resblocks
         n_feats = args.n_feats
@@ -20,10 +23,6 @@ class EDSR(nn.Module):
         scale = int(args.scale)
         act = nn.ReLU(True)
 
-        rgb_mean = (0.4488, 0.4371, 0.4040)
-        rgb_std = (1.0, 1.0, 1.0)
-        self.sub_mean = common.MeanShift(1.0, rgb_mean, rgb_std)
-        
         # define head module
         m_head = [conv(args.n_colors, n_feats, kernel_size)]
 
@@ -35,32 +34,36 @@ class EDSR(nn.Module):
         ]
         m_body.append(conv(n_feats, n_feats, kernel_size))
 
-        # define tail module
-        m_tail = [
-            common.Upsampler(conv, scale, n_feats, act=False),
-            nn.Conv2d(
-                n_feats, args.n_colors, kernel_size,
-                padding=(kernel_size//2)
-            )
-        ]
-
-        self.add_mean = common.MeanShift(1, rgb_mean, rgb_std, 1)
+        self.importance_map = ImportanceMap.ImportanceMap(map_layers = 18, feat_layers = 18, in_c=64)
+        self.kernel_construction = KernelConstruction.KernelConstruction(outC = 3)
+        self.supersampling = Supersampling.Supersampling(outC = 3, featC = 6, sep_kernel = True)
 
         self.head = nn.Sequential(*m_head)
         self.body = nn.Sequential(*m_body)
-        self.tail = nn.Sequential(*m_tail)
+        self.nonlinearity = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.sub_mean(x)
+        #特征提取的模块
         x = self.head(x)
-
         res = self.body(x)
         res += x
+        #end += skip connection
 
-        x = self.tail(res)
-        x = self.add_mean(x)
-
-        return x 
+        # print(res.shape) # torch.Size([16, 64, 64, 64])
+        # x = self.tail(res)
+        #预测feat，immap
+        feat, immap = self.importance_map(res)
+        # print(immap.shape)
+        # print(feat.shape)
+        #构建kernel
+        kernels = self.kernel_construction(immap)
+        # print(kernels.shape)
+        #应用kernel
+        out = self.supersampling(feat,kernels)
+        #最后加一层sigmoid激活层
+        out = self.nonlinearity(out)
+        # print(out.shape) # torch.Size([16, 3, 128, 128])
+        return out
 
     def load_state_dict(self, state_dict, strict=True):
         own_state = self.state_dict()

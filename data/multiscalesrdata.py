@@ -43,7 +43,14 @@ class SRData(data.Dataset):
     def __getitem__(self, idx):
         # 暂无数据增强模块
         lr, hr, filename = self._load_file(idx)
-        lr, hr = self.get_patch(lr, hr)
+        lr, hr = self.get_patch(lr, hr) # 500 
+        
+        # 16x3x64x64
+        # 500x16x3x64x64
+        # epoch increase 10x16x3x64x64 160x3x64x64   
+        # for i in range(500):
+        #    train()
+
         lr_c, hr_c = common.set_channel(lr, hr, n_channels=self.args.n_colors)
         lr_c_tensor, hr_c_tensor = common.np2Tensor(
             lr_c, hr_c, rgb_range=self.args.rgb_range

@@ -1,5 +1,6 @@
 import math
 import torch.nn as nn
+import torch
 
 def make_model(args, parent=False):
     return FSRCNN(args)
@@ -37,4 +38,5 @@ class FSRCNN(nn.Module):
         x = self.first_part(x)
         x = self.mid_part(x)
         x = self.last_part(x)
+        x = torch.clamp(x, min=0.0, max=1.0)
         return x

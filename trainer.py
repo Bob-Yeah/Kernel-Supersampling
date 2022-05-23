@@ -55,7 +55,7 @@ class Trainer():
         self.loss.start_log()
         self.model.train()
         
-        device = torch.device('cpu' if self.args.cpu else 'cuda')
+        device = torch.device('cpu' if self.args.cpu else 'cuda:2')
         # torch.autograd.set_detect_anomaly(True)
         timer_data, timer_model = utility.timer(), utility.timer()
         for batch, (lr, hr, name) in enumerate(self.loader_train):
@@ -76,23 +76,24 @@ class Trainer():
             # print(lr.shape)
             # print(hr.shape)
             # print(sr.shape)
-            if (epoch % 10 == 1):
-                import scipy.misc as misc
-                import numpy as np
-                import skimage.color as sc
 
-                normalized = sr[0].data.mul(255)
-                ndarr = normalized.byte().permute(1, 2, 0).cpu().numpy()
-                hr_norm = hr[0].data.mul(255)
-                hr_img = hr_norm.byte().permute(1, 2, 0).cpu().numpy()
-                # out = np.concatenate([ndarr,ndarr,ndarr], 2)
-                # # out = sc.ycbcr2rgb(out)
-                out = ndarr
-                # # high = sc.ycbcr2rgb(hr_img)
-                # high = np.concatenate([hr_img,hr_img,hr_img], 2)
-                high = hr_img
-                misc.imsave('saveout_run_y.png', out)
-                misc.imsave('saveout_hr_y.png', high)
+            # if (epoch % 10 == 1):
+            #     import scipy.misc as misc
+            #     import numpy as np
+            #     import skimage.color as sc
+
+            #     normalized = sr[0].data.mul(255)
+            #     ndarr = normalized.byte().permute(1, 2, 0).cpu().numpy()
+            #     hr_norm = hr[0].data.mul(255)
+            #     hr_img = hr_norm.byte().permute(1, 2, 0).cpu().numpy()
+            #     # out = np.concatenate([ndarr,ndarr,ndarr], 2)
+            #     # # out = sc.ycbcr2rgb(out)
+            #     out = ndarr
+            #     # # high = sc.ycbcr2rgb(hr_img)
+            #     # high = np.concatenate([hr_img,hr_img,hr_img], 2)
+            #     high = hr_img
+            #     misc.imsave('saveout_run_y.png', out)
+            #     misc.imsave('saveout_hr_y.png', high)
 
             loss = self.loss(sr, hr[:,0:self.args.n_colors,:,:])
             
@@ -132,18 +133,20 @@ class Trainer():
             ## save models
 
     def test(self):  
-        import scipy.misc as misc
+        import imageio
         def _save_results(filename, save_list, scale):
             filename = '{}/results/{}_x{}_'.format(self.ckp.dir, filename, scale)
             postfix = ('SR', 'LR', 'HR')
             for v, p in zip(save_list, postfix):
                 normalized = v[0].data.mul(self.args.rgb_range)
                 ndarr = normalized.byte().permute(1, 2, 0).cpu().numpy()
-                misc.imsave('{}{}.png'.format(filename, p), ndarr)
+                imageio.imwrite('{}{}.png'.format(filename, p), ndarr)
         
         self.model.eval()
         timer_test = utility.timer()
-        device = torch.device('cpu' if self.args.cpu else 'cuda')
+        device = torch.device('cpu' if self.args.cpu else 'cuda:2')
+        acc_time = 0
+
         with torch.no_grad():
             for idx_scale, scale in enumerate(self.scale):
                 eval_acc = 0
@@ -164,22 +167,25 @@ class Trainer():
                     start_time = time.time()
 
                     sr = self.model(lr[:,0:self.args.n_colors,:,:])
-
-                    # your code
+                    sr.cpu()
+                    
                     elapsed_time = time.time() - start_time
                     print("duration:",elapsed_time)
+
+                    acc_time += elapsed_time
+
                     m = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
                     ulr = m(lr)
                     # sr = ulr + sr
-
+                    print(sr.shape)
                     print(lr.shape)
                     print(hr.shape)
-                    print(sr.shape)
 
                     timer_test.hold()
 
                     save_list = [sr]
                     if not no_eval:
+                        
                         acc_i = utility.calc_psnr(
                             sr, hr, scale, self.args.rgb_range,
                             benchmark=self.loader_test.dataset.benchmark
@@ -187,19 +193,17 @@ class Trainer():
                         eval_acc += acc_i
 
                         print(acc_i)
-                        # SSIM的指标 这里的话就需要修改 ，直接用下面这个跑不起来
-                        # eval_acc_ssim += utility.calc_ssim(
-                        #     sr, hr, scale,
-                        #     benchmark=self.loader_test.dataset.benchmark
-                        # )
 
-                        # print(eval_acc_ssim)
-                        # print(utility.calc_ssim(
-                        #     lr, hr, scale,
-                        #     benchmark=self.loader_test.dataset.benchmark
-                        # ))
-                        
+                        # SSIM的指标 这里的话就需要修改 ，直接用下面这个跑不起来
+                        acc_ssim_i = utility.calc_ssim(
+                            sr.clone(), hr.clone(), scale,
+                            benchmark=self.loader_test.dataset.benchmark
+                        )
+                        eval_acc_ssim += acc_ssim_i
+                        print(acc_ssim_i)
+
                         save_list.extend([ulr, hr])
+                        
                     _save_results(filename,save_list,scale)
                     # print(save_list)
                     
@@ -215,11 +219,28 @@ class Trainer():
                     scale,
                     eval_acc  / len(self.loader_test),
                 ))
+
+                print('[{} x{}]\tSSMI: {:.3f}'.format(
+                    self.args.data_test,
+                    scale,
+                    eval_acc_ssim  / len(self.loader_test),
+                ))
+
+                print('[{} x{}]\tCPU Time: {:.4f}'.format(
+                    self.args.data_test,
+                    scale,
+                    acc_time  / len(self.loader_test),
+                ))
+
+                # print('[{} x{}]\tGPU Time: {:.3f}'.format(
+                #     self.args.data_test,
+                #     scale,
+                #     acc_time_cuda  / len(self.loader_test),
+                # ))
+
                     
-
-
     def prepare(self, *args):
-        device = torch.device('cpu' if self.args.cpu else 'cuda')
+        device = torch.device('cpu' if self.args.cpu else 'cuda:2')
         def _prepare(tensor):
             if self.args.precision == 'half': tensor = tensor.half()
             return tensor.to(device)

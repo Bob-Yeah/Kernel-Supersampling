@@ -5,6 +5,7 @@ import torch.nn as nn
 from model import ImportanceMap
 from model import KernelConstruction
 from model import Supersampling
+import torch
 
 def make_model(args, parent=False):
     if args.dilation:
@@ -21,7 +22,7 @@ class KernelEDSR(nn.Module):
         n_feats = args.n_feats
         kernel_size = 3 
         scale = int(args.scale)
-        act = nn.ReLU(True)
+        self.act = nn.ReLU(True)
 
         # define head module
         m_head = [conv(args.n_colors, n_feats, kernel_size)]
@@ -29,7 +30,7 @@ class KernelEDSR(nn.Module):
         # define body module
         m_body = [
             common.ResBlock(
-                conv, n_feats, kernel_size, act=act, res_scale=args.res_scale
+                conv, n_feats, kernel_size, act=self.act, res_scale=args.res_scale
             ) for _ in range(n_resblock)
         ]
         m_body.append(conv(n_feats, n_feats, kernel_size))
@@ -40,7 +41,10 @@ class KernelEDSR(nn.Module):
 
         self.head = nn.Sequential(*m_head)
         self.body = nn.Sequential(*m_body)
-        self.nonlinearity = nn.Sigmoid()
+        # self.nonlinearity = nn.Sigmoid()
+
+        self.residual1 = nn.Conv2d(18,3,kernel_size = 1)
+        self.residual2 = nn.Conv2d(3,3,kernel_size = 1)
 
     def forward(self, x):
         #特征提取的模块
@@ -53,15 +57,23 @@ class KernelEDSR(nn.Module):
         # x = self.tail(res)
         #预测feat，immap
         feat, immap = self.importance_map(res)
+
+        #residual 
+        residual = self.act(self.residual2(self.act(self.residual1(feat))))
+        
+        # print(residual.shape)
         # print(immap.shape)
         # print(feat.shape)
+
         #构建kernel
         kernels = self.kernel_construction(immap)
         # print(kernels.shape)
         #应用kernel
         out = self.supersampling(feat,kernels)
+        out = out + residual
         #最后加一层sigmoid激活层
-        out = self.nonlinearity(out)
+        out = torch.clamp(out, min=0.0, max=1.0)
+
         # print(out.shape) # torch.Size([16, 3, 128, 128])
         return out
 

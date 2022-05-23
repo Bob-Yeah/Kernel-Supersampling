@@ -156,7 +156,7 @@ def calc_psnr(sr, hr, scale, rgb_range, benchmark=False):
     return -10 * math.log10(mse)
 
     
-def calc_ssim(img1, img2, scale=2, benchmark=False):
+def calc_ssim(im1, im2, scale=2, benchmark=False):
     '''calculate SSIM
     the same outputs as MATLAB's
     img1, img2: [0, 255]
@@ -165,7 +165,8 @@ def calc_ssim(img1, img2, scale=2, benchmark=False):
         border = math.ceil(scale)
     else:
         border = math.ceil(scale)+6
-    
+    img1 = im1
+    img2 = im2
     img1 = img1.mul_(255.)
     img2 = img2.mul_(255.)
     img1 = img1.data.squeeze().float().clamp(0,255).round().cpu().numpy()

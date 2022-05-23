@@ -103,7 +103,7 @@ parser.add_argument('--start_epoch', type=int, default=0,
                     help='resume from the snapshot, and the start_epoch')
 
 # Loss specifications
-parser.add_argument('--loss', type=str, default='1*MSE',
+parser.add_argument('--loss', type=str, default='1*MSE+1*L1',
                     help='loss function configuration')
 parser.add_argument('--skip_threshold', type=float, default='1e6',
                     help='skipping batch that has large error')

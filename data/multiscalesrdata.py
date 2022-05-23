@@ -20,6 +20,8 @@ class SRData(data.Dataset):
         self.benchmark = benchmark
         self.scale = args.scale
         self._set_filesystem(args.dir_data)
+        print("self.dir_hr:",self.dir_hr)
+        print("self.dir_lr:",self.dir_lr)
         self.images_hr, self.images_lr = self._scan()
         
     # Below functions as used to prepare images

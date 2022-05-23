@@ -1,6 +1,6 @@
 # 模型应该没有问题，像素噪声一样的瑕疵，可能是训练的问题，最好就是看一下原文相关的训练的部分，更改一下训练参数或者逻辑
 from model import common
-
+import torch
 import torch.nn as nn
 
 def make_model(args, parent=False):
@@ -59,6 +59,7 @@ class EDSR(nn.Module):
 
         x = self.tail(res)
         x = self.add_mean(x)
+        x = torch.clamp(x, min=0.0, max=1.0)
 
         return x 
 

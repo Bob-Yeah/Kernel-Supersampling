@@ -18,7 +18,8 @@ class Benchmark(srdata.SRData):
         self.apath = os.path.join(dir_data,'benchmark', self.name)
         self.dir_hr = os.path.join(self.apath, 'HR')
         if (self.name == 'DIV2K_VID'):
-            self.dir_lr = os.path.join(self.apath, 'LR_unknown')
+            self.dir_lr = os.path.join(self.apath, 'LR_bicubic')
+            print("dir:",self.dir_lr)
         else:
             self.dir_lr = os.path.join(self.apath, 'LR_bicubic')
         self.ext = ('.png','.png')
